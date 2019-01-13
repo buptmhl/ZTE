@@ -39,7 +39,7 @@ class RwaNetwork(nx.Graph):
             # 内容行数
             for i in range(self.origin_data.shape[0]):
                 wave_occ = [0 for _ in range(wave_num)]
-                wave_avai = [True for i in wave_occ if i < 10]
+                wave_avai = [True for i in wave_occ if i < 4]
                 # None代表目标端口， False代表无端口
                 port_avai = [{self.origin_data[i, 1]:False,self.origin_data[i, 2]:False} for _ in range(wave_num)]
                 self.add_edge(self.origin_data[i, 1], self.origin_data[i, 2],
@@ -80,7 +80,6 @@ class RwaNetwork(nx.Graph):
                     # 增加源宿点的用于业务上下路的端口
                         target_units.append(src)
                         target_units.append(dst)
-                      
                         img = self.draw.draw(self, src, dst, nodes, target_units, -1)
                         rtn = np.concatenate((rtn, img), axis=0)
             return rtn
@@ -112,11 +111,11 @@ class RwaNetwork(nx.Graph):
         start_node = nodes[0]
         for i in range(1, len(nodes)):
             end_node = nodes[i]
-            assert amount <= 10
+            assert amount <= 4
            # print(self.get_edge_data(start_node, end_node)['wave_occ'][wave_index])
             if self.get_edge_data(start_node, end_node)['is_wave_avai'][wave_index] is True:
-                assert self.get_edge_data(start_node, end_node)['wave_occ'][wave_index] <= 10
-                if self.get_edge_data(start_node, end_node)['wave_occ'][wave_index] < amount:
+                assert self.get_edge_data(start_node, end_node)['wave_occ'][wave_index] <= 4
+                if amount < 4:
                     self.get_edge_data(start_node, end_node)['is_wave_avai'][wave_index] = True
                 else:
                     self.get_edge_data(start_node, end_node)['is_wave_avai'][wave_index] = False
@@ -198,8 +197,7 @@ class RwaNetwork(nx.Graph):
             for wave_index in range(self.wave_num):
                 is_avai = True
                 for edge in edges:
-#                    print(self.get_edge_data(edge[0], edge[1])['wave_occ'][wave_index])
-                    if self.get_edge_data(edge[0], edge[1])['wave_occ'][wave_index] >= 10:
+                    if self.get_edge_data(edge[0], edge[1])['wave_occ'][wave_index] >= 4:
                         is_avai = False
                         break
                 if is_avai is True:
@@ -218,7 +216,7 @@ class RwaNetwork(nx.Graph):
         is_avai = True
         for edge in edges:
            # print('occupy of bandwidth:', self.get_edge_data(edge[0], edge[1])['wave_occ'][wave_index])
-            if self.get_edge_data(edge[0], edge[1])['wave_occ'][wave_index] >= 10:
+            if self.get_edge_data(edge[0], edge[1])['wave_occ'][wave_index] >= 4:
                 is_avai = False
                 break
         return is_avai
@@ -234,7 +232,7 @@ class RwaNetwork(nx.Graph):
         is_avai = True
         for edge in edges:
            # print('occupy of bandwidth:', self.get_edge_data(edge[0], edge[1])['wave_occ'][wave_index])
-            if self.get_edge_data(edge[0], edge[1])['wave_occ'][wave_index] > 10:
+            if self.get_edge_data(edge[0], edge[1])['wave_occ'][wave_index] > 4:
                 is_avai = False
                 break
         return is_avai
@@ -261,30 +259,26 @@ class RwaNetwork(nx.Graph):
         target_units = []
         start_nodes = []
         end_nodes = []
-        cost = 1002.4
+        st_n = []
+        en_n = []
+        cost = 100
         for link in path:
             start_nodes.append(link[0])
             end_nodes.append(link[1])
             link_cost = self.get_edge_data(link[0], link[1])['weight']
             cost += link_cost
-            cost += 708
-            if cost > 17800:
+            cost += 50
+            if cost > 800:
                 target_units.append(link[0])
                 cost = self.get_edge_data(link[0], link[1])['weight']
-                cost += 708
-                cost += 1002.4
+                cost += 50
+                cost += 100
         for target_unit in target_units:
-            for i in range(len(start_nodes)):
-                if target_unit == start_nodes[i]:
-                    start_nodes[i] = True
-                else:
-                    start_nodes[i] = False
-            for i in range(len(end_nodes)):
-                if target_unit == end_nodes[i]:
-                    end_nodes[i] = True
-                else:
-                    end_nodes[i] = False
-        return target_units, start_nodes, end_nodes
+            if target_unit in start_nodes:
+                st_n.append(target_unit)
+            if target_unit in end_nodes:
+                en_n.append(target_unit)
+        return target_units, st_n, en_n
 
     def is_service_exist(self, link: tuple, wave_index):
         """
@@ -347,7 +341,8 @@ class RwaNetwork(nx.Graph):
         all_edges = self.edges()
         port_sum = [0 for _ in self.wave_num]
         for edge in all_edges:
-            port = self.get_port_avai(edge[0], edge[1])
-            port_sum = [port_sum[i] + port[i] for i in range(len(self.wave_num))]
+            port = self.get_port_avai(edge, edge[0])
+            ports = self.get_port_avai(edge, edge[1])
+            port_sum = [port_sum[i] + port[i] + ports[i] for i in range(len(self.wave_num))]
         return port_sum, sum(port_sum)
 

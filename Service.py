@@ -15,13 +15,15 @@ modes = ['alg', 'learning']
 INIT = 0
 # 没有可达的RW选项：
 NOARRIVAL_NO = -1            # 选择No-Action选项
-NOARRIVAL_OT = -2            # 选择其他RW选项
-# 选择不可达的RW选项
-ARRIVAL_NO = -3       # 选择No-Action选项
+NOARRIVAL_OT = -1            # 选择其他RW选项
+# 有可达的RW选项
+ARRIVAL_NO = -2       # 选择No-Action选项
 # 可达的不增加新端口的RW选项：
 ARRIVAL_NOPORT = 2   # 选择不增加新端口的RW选项
 # 可达的增加新端口的RW选项：
-ARRIVAL_NEWPORT = 1      # 选择增加新端口的RW选项
+ARRIVAL_NEWPORT = 0      # 选择增加新端口的RW选项
+# 可达的rw选项中选择了不可达的rw
+ARRIVAL_OT = -1
 
 
 class Service(object):
@@ -79,7 +81,7 @@ class RwaGame(object):
         self.service_index = 0
         # self.time = 0
         self.net = RwaNetwork(file_name=self.net_config, wave_num=self.wave_num)
-        self.services = self.get_services()
+        self.services = self.get_simulationService()
         # self.events = []  # time_point, service_index, is_arrival_event
         self.step_over = step_over
 
@@ -177,6 +179,8 @@ class RwaGame(object):
             reward = self.exec_action(action, ser)
             observation = self.net.gen_img(None, None, self.mode)
             done = True
+            port = self.get_all_edges_port()
+            print('总端口数量为：', port)
             return observation, reward, done, info
         # 对于一般业务，执行选择的action后转向下一业务
         if self.service_index < len(self.services)-1:
@@ -218,10 +222,13 @@ class RwaGame(object):
                 if self.net.is_allocable(path_list[route_index], wave_index):      
                     path = self.net.extract_path(path_list[route_index])
                #    print('length of path is:', len(path))
+                    port_sit = False
                     if self.net.get_port_avai(path[0], service.src)[wave_index] is False:
                         self.net.set_port_avai(path[0], service.src, True, wave_index)
+                        port_sit = True
                     if self.net.get_port_avai(path[-1], service.dst)[wave_index] is False:
                         self.net.set_port_avai(path[-1], service.dst, True, wave_index)
+                        port_sit = True
                     # 得到当前拓扑每条链路的业务状态以及端口信息
                     is_services = []
                     start_nodes = []
@@ -232,8 +239,8 @@ class RwaGame(object):
                     # 得到所选路径的端口信息，curr包括True和False
                     _, curr_start_nodes, curr_end_nodes = self.net.cost_port(path_list[route_index])
                     # 得到一条路径中的每条链路端口的起始节点端口标号
-                    curr_start_nodes = self.net.get_port_index(curr_start_nodes)
-                    curr_end_nodes = self.net.get_port_index(curr_end_nodes)
+                  #  curr_start_nodes = self.net.get_port_index(curr_start_nodes)
+                  #  curr_end_nodes = self.net.get_port_index(curr_end_nodes)
                     for link in path:
                         # 得到拓扑中所选的整个路径的端口信息和业务情况
                         is_service, start_node, end_node = self.net.is_service_exist(link, wave_index)
@@ -265,69 +272,94 @@ class RwaGame(object):
                     # 若不存在业务则此条链路不需要增加端口
                   #  print('occupy of bandwidth:', self.net.get_edge_data(path[i][0], path[i][1])['wave_occ'][wave_index])
                         n = len(is_services)-1
-                        if i == 0 and is_exist is True:
-                            curr_bandwidth = self.net.get_edge_data(path[i][0], path[i][1])['wave_occ'][wave_index]
-                            if self.net.get_port_avai(path[i], path[i][0])[wave_index] is True and  \
-                                self.net.get_port_avai(path[i], path[i][1])[wave_index] is True and \
-                                    self.net.get_port_avai(path[i], path[i][0])[wave_index] is True:
+                        if i == n and i == 0:
+                            if is_exist is True: 
+                                curr_bandwidth = self.net.get_edge_data(path[i][0], path[i][1])['wave_occ'][wave_index]
+                                if self.net.get_port_avai(path[i], path[i][0])[wave_index] is True and  \
+                                    self.net.get_port_avai(path[i], path[i][1])[wave_index] is True:
+                                    self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth+1)
+                                    change = False
+                                else:
+                                    if self.net.get_port_avai(path[i], path[i][0])[wave_index] is False:
+                                        self.net.set_port_avai(path[i], path[i][0], True, wave_index)
+                                    elif self.net.get_port_avai(path[i], path[i][1])[wave_index] is False:
+                                        self.net.set_port_avai(path[i], path[i][1], True, wave_index)
+                                    change = True
+                                    self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth+1)
+                                ser_converge_change_situation.append(change)
+                            else:
+                                assert is_exist is False
+                                curr_bandwidth = self.net.get_edge_data(path[i][0], path[i][1])['wave_occ'][wave_index]
+                                assert curr_bandwidth == 0
                                 self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth+1)
                                 change = False
-                            else:
-                                if self.net.get_port_avai(path[i], path[i][0])[wave_index] is False:
-                                    self.net.set_port_avai((path[i][0], path[i][1]), path[i][0], True, wave_index)
-                                elif self.net.get_port_avai(path[i], path[i][1])[wave_index] is False:
-                                    self.net.set_port_avai((path[i][0], path[i][1]), path[i][1], True, wave_index)
-                                elif self.net.get_port_avai(path[i+1], path[i+1][0])[wave_index] is False:
-                                    self.net.set_port_avai((path[i+1][0], path[i+1][1]), path[i+1][0], True, wave_index)
-                                self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth + 1)
-                                change = True
-                            ser_converge_change_situation.append(change)
-                        # 如果是最后一条链路
-                        if i == n and is_exist is True and i != 0:
-                            curr_bandwidth = self.net.get_edge_data(path[i][0], path[i][1])['wave_occ'][wave_index]
-                            if self.net.get_port_avai(path[i], path[i][0])[wave_index] is True and \
-                                self.net.get_port_avai(path[i], path[i][1])[wave_index] is True and \
-                                    self.net.get_port_avai(path[i-1], path[i-1][1])[wave_index] is True:
-                                self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth + 1)
-                                change = False
-                            else:
-                                if self.net.get_port_avai(path[i], path[i][0])[wave_index] is False:
-                                    self.net.set_port_avai((path[i][0], path[i][1]), path[n][0], True, wave_index)
-                                elif self.net.get_port_avai(path[i], path[i][1])[wave_index] is False:
-                                    self.net.set_port_avai((path[i][0], path[i][1]), path[i][1], True, wave_index)
-                                elif self.net.get_port_avai(path[i-1], path[i-1][1])[wave_index] is False:
-                                    self.net.set_port_avai((path[i-1][0], path[i-1][1]), path[i-1][1], True, wave_index)
-                                self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth + 1)
-                                change = True
-                            ser_converge_change_situation.append(change)
-                        # 中间链路
-                        if i != 0 and i != n and is_exist is True:
-                            curr_bandwidth = self.net.get_edge_data(path[i][0], path[i][1])['wave_occ'][wave_index]
-                            if self.net.get_port_avai(path[i], path[i][0])[wave_index] is True and \
-                                self.net.get_port_avai(path[i], path[i][1])[wave_index] is True and \
-                                self.net.get_port_avai(path[i - 1], path[i - 1][1])[wave_index] is True and \
-                                    self.net.get_port_avai(path[i + 1], path[i + 1][0])[wave_index] is True:
-                                self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth + 1)
-                                change = False
-                            else:
-                                if self.net.get_port_avai(path[i], path[i][0])[wave_index] is False:
-                                    self.net.set_port_avai((path[i][0], path[i][1]), path[i][0], True, wave_index)
-                                elif self.net.get_port_avai(path[i], path[i][1])[wave_index] is False:
-                                    self.net.set_port_avai((path[i][0], path[i][1]), path[i][1], True, wave_index)
-                                elif self.net.get_port_avai(path[i-1], path[i-1][1])[wave_index] is False:
-                                    self.net.set_port_avai((path[i-1][0], path[i-1][1]), path[i-1][1], True, wave_index)
-                                elif self.net.get_port_avai(path[i+1], path[i+1][0])[wave_index] is False:
-                                    self.net.set_port_avai((path[i+1][0], path[i+1][1]), path[i+1][0], True, wave_index)
-                                self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth + 1)
-                                change = True
-                            ser_converge_change_situation.append(change)
+                                ser_converge_change_situation.append(change)
+                        else:
+                            if i == 0 and is_exist is True:
+                                assert len(path) >= 2
+                                curr_bandwidth = self.net.get_edge_data(path[i][0], path[i][1])['wave_occ'][wave_index]
+                                if self.net.get_port_avai(path[i], path[i][0])[wave_index] is True and  \
+                                    self.net.get_port_avai(path[i], path[i][1])[wave_index] is True and \
+                                        self.net.get_port_avai(path[i+1], path[i+1][0])[wave_index] is True:
+                                    self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth+1)
+                                    change = False
+                                else:
+                                    if self.net.get_port_avai(path[i], path[i][0])[wave_index] is False:
+                                        self.net.set_port_avai(path[i], path[i][0], True, wave_index)
+                                    elif self.net.get_port_avai(path[i], path[i][1])[wave_index] is False:
+                                        self.net.set_port_avai(path[i], path[i][1], True, wave_index)
+                                    elif self.net.get_port_avai(path[i+1], path[i+1][0])[wave_index] is False:
+                                        self.net.set_port_avai(path[i+1], path[i+1][0], True, wave_index)
+                                    self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth + 1)
+                                    change = True
+                                ser_converge_change_situation.append(change)
+                            # 如果是最后一条链路
+                            if i == n and is_exist is True and i != 0:
+                                curr_bandwidth = self.net.get_edge_data(path[i][0], path[i][1])['wave_occ'][wave_index]
+                                if self.net.get_port_avai(path[i], path[i][0])[wave_index] is True and \
+                                    self.net.get_port_avai(path[i], path[i][1])[wave_index] is True and \
+                                        self.net.get_port_avai(path[i-1], path[i-1][1])[wave_index] is True:
+                                    self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth + 1)
+                                    change = False
+                                else:
+                                    if self.net.get_port_avai(path[i], path[i][0])[wave_index] is False:
+                                        self.net.set_port_avai(path[i], path[i][0], True, wave_index)
+                                    elif self.net.get_port_avai(path[i], path[i][1])[wave_index] is False:
+                                        self.net.set_port_avai(path[i], path[i][1], True, wave_index)
+                                    elif self.net.get_port_avai(path[i-1], path[i-1][1])[wave_index] is False:
+                                        self.net.set_port_avai(path[i-1], path[i-1][1], True, wave_index)
+                                    self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth + 1)
+                                    change = True
+                                ser_converge_change_situation.append(change)
+                            # 中间链路
+                            if i != 0 and i != n and is_exist is True:
+                                curr_bandwidth = self.net.get_edge_data(path[i][0], path[i][1])['wave_occ'][wave_index]
+                                if self.net.get_port_avai(path[i], path[i][0])[wave_index] is True and \
+                                    self.net.get_port_avai(path[i], path[i][1])[wave_index] is True and \
+                                    self.net.get_port_avai(path[i - 1], path[i - 1][1])[wave_index] is True and \
+                                        self.net.get_port_avai(path[i + 1], path[i + 1][0])[wave_index] is True:
+                                    self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth + 1)
+                                    change = False
+                                else:
+                                    if self.net.get_port_avai(path[i], path[i][0])[wave_index] is False:
+                                        self.net.set_port_avai(path[i], path[i][0], True, wave_index)
+                                    elif self.net.get_port_avai(path[i], path[i][1])[wave_index] is False:
+                                        self.net.set_port_avai(path[i], path[i][1], True, wave_index)
+                                    elif self.net.get_port_avai(path[i-1], path[i-1][1])[wave_index] is False:
+                                        self.net.set_port_avai(path[i-1], path[i-1][1], True, wave_index)
+                                    elif self.net.get_port_avai(path[i+1], path[i+1][0])[wave_index] is False:
+                                        self.net.set_port_avai(path[i+1], path[i+1][0], True, wave_index)
+                                    self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth + 1)
+                                    change = True
+                                ser_converge_change_situation.append(change)
                         # 如果一条链路没有业务存在
-                        if is_exist is False:
+                            if is_exist is False:
                             # 设置波长状态
-                            curr_bandwidth = self.net.get_edge_data(path[i][0], path[i][1])['wave_occ'][wave_index]
-                            self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth + 1)
-                            change = False
-                            ser_converge_change_situation.append(change)
+                                curr_bandwidth = self.net.get_edge_data(path[i][0], path[i][1])['wave_occ'][wave_index]
+                                assert curr_bandwidth == 0
+                                self.net.set_wave_state(wave_index, [path[i][0], path[i][1]], curr_bandwidth + 1)
+                                change = False
+                                ser_converge_change_situation.append(change)
                     # 将中继和业务汇聚端口情况进行整合
                # print('ser_relay_change_situation',ser_relay_change_situation) 
                # print('ser_converge_change_situation',ser_converge_change_situation)
@@ -340,6 +372,7 @@ class RwaGame(object):
                             total_change_situation.append(ser_converge_change_situation[g])
                         else:
                             total_change_situation.append(True)
+                    total_change_situation.append(port_sit)
                # print('total change situation:',total_change_situation)
                     # 不需要增加新端口
                     if True not in total_change_situation:
@@ -352,7 +385,7 @@ class RwaGame(object):
                         service.add_allocation(path_list[route_index], wave_index)
                         return ARRIVAL_NEWPORT
                 else:
-                    return ARRIVAL_NO  
+                    return ARRIVAL_OT
             else:
                 return NOARRIVAL_OT
 
@@ -413,6 +446,23 @@ class RwaGame(object):
                 num += 1
         return file_services
 
+    def get_simulationService(self):
+        index = 0
+        services = {}
+        # sort_index = []
+        # tt = [(1, 6), (1, 8), (1, 9), (2, 7), (2, 9), (3, 6), (3, 7), (3, 8), (4, 9), (5, 3), (1, 5), (7, 5),
+        #       (5, 9), (6, 7), (8, 3), [4, 6], [2, 8]]
+        tt = [(1, 6), (1, 8), (2, 7), (2, 9), (3, 6), (3, 7), (3, 8), (4, 9), (5, 3), (1, 5), (7, 5),
+              (5, 9), (6, 7), (8, 3), [4, 6]]
+        for src, dst in tt:
+            for _ in range(8):
+#                print(index)
+                src = str(src)
+                dst = str(dst)
+                services[index] = Service(index, src, dst)
+                index += 1
+        return services
+
     def get_all_edges_port(self):
         """
         :return:得到所有波长的端口总数量和端口的总数量
@@ -435,3 +485,18 @@ class RwaGame(object):
             port = [port_start[i] + port_end[i] for i in range(self.wave_num)]
             port_sum = [port_sum[i] + port[i] for i in range(self.wave_num)]
         return port_sum, sum(port_sum)
+
+    def get_resourceUtilization(self):
+        """
+        得到整个网络的资源利用率
+        :return:
+        """
+        wave_total_usage = [0 for _ in range(self.wave_num)]
+        edge_num = len(self.net.edges)
+        total_resource = self.wave_num * edge_num * len(self.net.draw.color)
+        for edge in self.net.edges:
+            usage = self.net.get_edge_data(edge[0], edge[1])['wave_occ']
+            wave_total_usage = [wave_total_usage[i] + usage[i] for i in range(self.wave_num)]
+        wave_occ_sum = sum(wave_total_usage)
+        resource_utilization_rate = wave_occ_sum / total_resource
+        return wave_occ_sum, resource_utilization_rate
