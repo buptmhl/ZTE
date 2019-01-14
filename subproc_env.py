@@ -32,6 +32,9 @@ def worker(remote, parent_remote, env_fn_wrapper):
         elif cmd == 'get_all_edges_port':
             port_sum, port_all = env.get_all_edges_port()
             remote.send((port_sum, port_all))
+        elif cmd == 'get_resourceUtilization':
+            wave_occ_sum, resource_utilization_rate = env.get_resourceUtilization()
+            remote.send((wave_occ_sum, resource_utilization_rate))
         else:
             raise NotImplementedError
 
@@ -113,6 +116,13 @@ class SubprocEnv(object):
         results = [remote.recv() for remote in self.remotes]
         port_sum, port_all = zip(*results)
         return port_sum, port_all
+
+    def get_resourceUtilization(self):
+        for remote in self.remotes:
+            remote.send(('get_resourceUtilization', None))
+        results = [remote.recv() for remote in self.remotes]
+        wave_occ_sum, resource_utilization_rate = zip(*results)
+        return wave_occ_sum, resource_utilization_rate
 
     def close(self):
         if self.closed:

@@ -203,6 +203,8 @@ def main():
             final_rewards *= masks
             final_rewards += (1 - masks) * episode_rewards
             episode_rewards *= masks
+#            if done[len(done)-1]:
+ #               print('游戏结束最终端口数量：',envs.get_all_edges_port())
 
             if args.cuda.startswith("True"):
                 masks = masks.cuda()
@@ -309,10 +311,11 @@ def main():
             blocked_services = total_services - allocated_services
             bp = blocked_services / total_services
             wave_port_num, total_port_num = envs.get_all_edges_port()
+            wave_occ_sum, resource_utilization_rate = envs.get_resourceUtilization()
 
             print("Updates {}, num timesteps {}, FPS {}, mean/median reward {:.1f}/{:.1f}, min/max reward {:.1f}/{:.1f}, \
-            entropy {:.5f}, value loss {:.5f}, policy loss {:.8f}, remaining time {}:{}, bp is {}/{}={}, \
-                  each wave port{}, total ports is {}".
+            entropy {:.5f}, value loss {:.5f}, policy loss {:.8f}, remaining time {}:{}, 阻塞率为{}/{}={}, \
+                  各个波长端口数量为{}, 总的端口数量为{}, 带宽占用情况为{}, 资源占用率为{}".
                   format(updata_i, total_num_steps,
                          int(total_num_steps / (end - start)),
                          final_rewards.mean(),
@@ -321,7 +324,8 @@ def main():
                          final_rewards.max(), cls_entropy.data,
                          value_loss.data, action_loss.data,
                          remaining_hours, remaining_minutes,
-                         blocked_services, total_services, bp,wave_port_num, total_port_num)
+                         blocked_services, total_services, bp,wave_port_num, total_port_num, wave_occ_sum,
+                         resource_utilization_rate)
                          )
             # raise NotImplementedError
             total_services = 0
