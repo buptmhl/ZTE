@@ -94,5 +94,6 @@ parser.add_argument('--num-mini-batch', type=int, default=32,
                     help='number of batches for ppo (default: 32)')
 parser.add_argument('--clip-param', type=float, default=0.2,
                     help='ppo clip parameter (default: 0.2)')
+parser.add_argument('--parameter', type=str, default="F")
 
 args = parser.parse_args()

@@ -84,7 +84,8 @@ class RwaGame(object):
         self.services = self.get_simulationService()
         # self.events = []  # time_point, service_index, is_arrival_event
         self.step_over = step_over
-
+        self.total_ser = 0
+        self.allow_ser = 0
     # def gen_src_dst(self):
     #     nodes = list(self.net.nodes())
     #     assert len(nodes) > 1
@@ -100,6 +101,8 @@ class RwaGame(object):
         :return:
         """
         self.service_index = 0
+        self.total_ser = 0
+        self.allow_ser = 0
         ss = {}
         self.net = RwaNetwork(file_name=self.net_config, wave_num=self.wave_num)
 
@@ -110,7 +113,8 @@ class RwaGame(object):
 
         # 返回第一个业务请求的状态
         src, dst = self.services[0].src, self.services[0].dst
-        observation = self.net.gen_img(src, dst, self.mode)
+        action = self.k * self.wave_num
+        observation = self.net.gen_img(src, dst, self.mode, True, action, False)
         reward = INIT
         done = False
         info = False
@@ -124,7 +128,8 @@ class RwaGame(object):
         """
         self.service_index = 0
         self.net = RwaNetwork(file_name=self.net_config, wave_num=self.wave_num)
-
+        self.total_ser = 0
+        self.allow_ser = 0
         # for base_index in range(self.max_iter):
         #     src, dst = self.gen_src_dst()
         #     # arrival = np.random.poisson(lam=self.rou) + base_time + 1
@@ -138,7 +143,8 @@ class RwaGame(object):
 
         # 返回第一个业务请求的状态
         src, dst = self.services[self.service_index].src, self.services[self.service_index].dst
-        observation = self.net.gen_img(src, dst, self.mode)
+        action = self.k * self.wave_num
+        observation = self.net.gen_img(src, dst, self.mode, True, action, False)
         reward = INIT
         done = False
         info = True
@@ -176,11 +182,18 @@ class RwaGame(object):
         if self.service_index == len(self.services)-1:
             info = True
             ser = self.services[self.service_index]
+            last_ser = self.services[self.service_index-1]
             reward = self.exec_action(action, ser)
-            observation = self.net.gen_img(None, None, self.mode)
+            same_ser = False
+            if ser.src == last_ser.src and ser.dst == last_ser.dst:
+                same_ser = True
+            observation = self.net.gen_img(None, None, self.mode, False, action, same_ser)
             done = True
             port = self.get_all_edges_port()
-            print('总端口数量为：', port)
+            usility = self.get_resourceUtilization()
+            print('总端口数量为', port)
+            print('资源占用率为{}'.format(usility))
+            print('阻塞率为：',((self.total_ser-self.allow_ser)/self.total_ser))
             return observation, reward, done, info
         # 对于一般业务，执行选择的action后转向下一业务
         if self.service_index < len(self.services)-1:
@@ -189,7 +202,11 @@ class RwaGame(object):
             reward = self.exec_action(action, current_ser)
             self.service_index += 1
             next_ser = self.services[self.service_index]
-            observation = self.net.gen_img(next_ser.src, next_ser.dst, self.mode)
+            same_ser = False
+           # first = False
+            if next_ser.src == current_ser.src and next_ser.dst == current_ser.dst:
+                same_ser = True
+            observation = self.net.gen_img(next_ser.src, next_ser.dst, self.mode, False, action, same_ser)
             return observation, reward, done, info
 
     def exec_action(self, action: int, service: Service) -> float:
@@ -201,7 +218,8 @@ class RwaGame(object):
         :return: reward
         """
       #  print('Action:', action)
-        print('当前进程号：{},Action is {}'.format(os.getpid(), action))
+      #  print('当前进程号：{},Action is {}'.format(os.getpid(), action))
+        self.total_ser += 1
         path_list = self.k_shortest_paths(service.src, service.dst)
    #     route_index = action // self.wave_num
     #    wave_index = action % self.wave_num
@@ -378,11 +396,13 @@ class RwaGame(object):
                     if True not in total_change_situation:
                         assert self.net.can_allocable(path_list[route_index], wave_index) == True
                         service.add_allocation(path_list[route_index], wave_index)
+                        self.allow_ser += 1
                         return ARRIVAL_NOPORT
                     # 需要增加新端口
                     else:
                         assert self.net.can_allocable(path_list[route_index], wave_index) == True
                         service.add_allocation(path_list[route_index], wave_index)
+                        self.allow_ser += 1
                         return ARRIVAL_NEWPORT
                 else:
                     return ARRIVAL_OT
@@ -453,14 +473,40 @@ class RwaGame(object):
         # tt = [(1, 6), (1, 8), (1, 9), (2, 7), (2, 9), (3, 6), (3, 7), (3, 8), (4, 9), (5, 3), (1, 5), (7, 5),
         #       (5, 9), (6, 7), (8, 3), [4, 6], [2, 8]]
         tt = [(1, 6), (1, 8), (2, 7), (2, 9), (3, 6), (3, 7), (3, 8), (4, 9), (5, 3), (1, 5), (7, 5),
+<<<<<<< Updated upstream
               (5, 9), (6, 7), (8, 3), [4, 6]]
+=======
+              (5, 9), (6, 7), (8, 3), (4, 6)]
+        ksp_ser = []
+>>>>>>> Stashed changes
         for src, dst in tt:
             for _ in range(8):
 #                print(index)
                 src = str(src)
                 dst = str(dst)
                 services[index] = Service(index, src, dst)
+<<<<<<< Updated upstream
                 index += 1
+=======
+                ksp_ser.append(index)
+                index += 1
+#        if args.comp.startswith("random"):
+ #           random.shuffle(ksp_ser)
+  #          for index in ksp_ser:
+   #             i = 0
+    #            services[i] = Service(services[index], services[index].src, services[index].dst)
+     #           i += 1
+        return services
+      
+    def get_out_of_order_service(self):
+        ser = self.get_simulationService()
+        ser_index = ser.keys()
+        random.shuffle(ser_index) 
+        services = {}
+        for index in ser_index:
+            i = 0
+            services[i] = Service(ser[index], ser[index].src), ser[index].dst
+>>>>>>> Stashed changes
         return services
 
     def get_all_edges_port(self):

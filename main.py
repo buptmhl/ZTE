@@ -287,6 +287,7 @@ def main():
             save_path = os.path.join(args.save_dir, 'a2c')
             save_path = os.path.join(save_path, args.cnn)
             save_path = os.path.join(save_path, args.step_over)
+            save_path = os.path.join(save_path, args.parameter)
             if os.path.exists(save_path) and os.path.isdir(save_path):
                 pass
             else:

@@ -188,11 +188,7 @@ class PltRwa(object):
                     shp = pt.Circle(xy=(loc[0]+bias, loc[1]+bias), radius=self.node_size/2, facecolor='red'
                                     , linewidth=0.4, fill=False)
                 else:
-<<<<<<< HEAD
                     shp = pt.Rectangle((loc[0], loc[1]), self.node_size, self.node_size, 
-=======
-                    shp = pt.Rectangle((loc[0], loc[1]), self.node_size, self.node_size, edgecolor='r',
->>>>>>> 4b9f2161def374b9cdf2f02aca5cb3964895b81a
                                        facecolor='black')
                 ax.add_patch(shp)
             # 把经过的所有链路画出来

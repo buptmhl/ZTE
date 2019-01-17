@@ -24,6 +24,7 @@ class RwaNetwork(nx.Graph):
         self.net_name = file_name.split('.')[0]
         self.wave_num = wave_num
         self.append_route = append_route
+        self.rtn = None
         if append_route:
             print("open append-route option")
             self.k = k
@@ -51,7 +52,7 @@ class RwaNetwork(nx.Graph):
                            line_width=args.line_width, node_size=args.node_size, net_name=file_name,
                            prefix=file_prefix)
 
-    def gen_img(self, src: str, dst: str, mode: str) -> np.ndarray:
+    def gen_img(self, src: str, dst: str, mode: str, first: bool, action: int, is_same: bool) -> np.ndarray:
         """
         指定波长画端口还是路由画端口？
         :param src:
@@ -62,14 +63,31 @@ class RwaNetwork(nx.Graph):
         if mode.startswith('alg'):
             return np.array([src, dst])
         elif mode.startswith('learning'):
-            rtn = None
-            for wave_index in range(self.wave_num):
-                # 拓扑，源，宿，路由，目标端口节点，波长索引
-                img = self.draw.draw(self, src, dst, None, None, wave_index)  # 画出指定波长拓扑
-                if rtn is not None:
-                    rtn = np.concatenate((rtn, img), axis=0)
+         #   rtn = None
+            if first:
+                for wave_index in range(self.wave_num):
+                    # 拓扑，源，宿，路由，目标端口节点，波长索引
+                    img = self.draw.draw(self, src, dst, None, None, wave_index)  # 画出指定波长拓扑
+                    if self.rtn is not None:
+                        self.rtn = np.concatenate((self.rtn, img), axis=0)
+                    else:
+                        self.rtn = np.array(img)
+            else:
+                if is_same:
+                    if action != args.k * args.wave_num:
+                        img = self.draw.draw(self, src, dst, None, None, action)
+                        self.rtn[action] = img
+                        self.rtn = self.rtn[:-1, :]
+                    else:
+                        self.rtn = self.rtn[:-1, :]
                 else:
-                    rtn = np.array(img)
+                    self.rtn = None
+                    for wave_index in range(self.wave_num):
+                        img = self.draw.draw(self, src, dst, None, None, wave_index)  # 画出指定波长拓扑
+                        if self.rtn is not None:
+                            self.rtn = np.concatenate((self.rtn, img), axis=0)
+                        else:
+                            self.rtn = np.array(img)
             # 判断是否将路由信息也放进去
             if self.append_route:  # 如果有路由信息，算路后，对每一条路画图
                 if src is not None and dst is not None:
@@ -81,8 +99,8 @@ class RwaNetwork(nx.Graph):
                         target_units.append(src)
                         target_units.append(dst)
                         img = self.draw.draw(self, src, dst, nodes, target_units, -1)
-                        rtn = np.concatenate((rtn, img), axis=0)
-            return rtn
+                        self.rtn = np.concatenate((self.rtn, img), axis=0)
+            return self.rtn
         else:
             raise ValueError("wrong mode parameter")
 
