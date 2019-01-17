@@ -3,7 +3,11 @@ use('Agg')
 from args import args
 import os
 from model import MobileNetV2, SimpleNet, AlexNet, SqueezeNet, SimplestNet
+<<<<<<< HEAD
 from Service import RwaGame, ARRIVAL_NEWPORT, ARRIVAL_NOPORT
+=======
+from Service import RwaGame, ARRIVAL_OP_OT
+>>>>>>> f2e48ddc65b99a1e310a4fc49fe7bd40f238862c
 import torch
 from torch.autograd import Variable
 
@@ -71,12 +75,20 @@ def random_comp(times: int=1):
     结果中会显示网络状态与业务请求，以及根据不同策略执行的选择
     :return:
     """
+<<<<<<< HEAD
     env = RwaGame(net_config=args.net, wave_num=args.wave_num, k=args.k, mode=args.mode, img_width=args.img_width,
                   img_height=args.img_height, weight=weight, step_over=args.step_over)
 
    # for model_file in reversed(sorted(os.listdir(directory), key=lambda item: int(item.split('.')[0]))):
     for _ in range(1):
         model_file = '26400.tar'
+=======
+    env = RwaGame(net_config=args.net, wave_num=args.wave_num, rou=args.rou, miu=args.miu,
+                  max_iter=args.max_iter, k=args.k, mode=args.mode, img_width=args.img_width,
+                  img_height=args.img_height, weight=weight, step_over=args.step_over)
+
+    for model_file in reversed(sorted(os.listdir(directory), key=lambda item: int(item.split('.')[0]))):
+>>>>>>> f2e48ddc65b99a1e310a4fc49fe7bd40f238862c
         model_file = os.path.join(directory, model_file)
         print("evaluate model {}".format(model_file))
         params = torch.load(model_file)
@@ -94,6 +106,7 @@ def random_comp(times: int=1):
                 action = action.data.numpy()[0]
                 obs, reward, done, info = env.step(action=action[0])
                 total_reward += reward
+<<<<<<< HEAD
                 if reward == ARRIVAL_NEWPORT or reward == ARRIVAL_NOPORT:
                     allocated_services += 1
                 if args.step_over.startswith('one_service'):
@@ -106,6 +119,20 @@ def random_comp(times: int=1):
             bp = (total_services-allocated_services) / total_services
             print("{}: allocated services is {}, total services is {}, bp is {}, 端口数量为{}，资源利用率为{}"
                   .format(model_file, allocated_services,total_services, bp, port, usility))
+=======
+                if reward == ARRIVAL_OP_OT:
+                    allocated_services += 1
+                if args.step_over.startswith('one_time'):
+                    if info:
+                        total_services += 1
+                elif args.step_over.startswith('one_service'):
+                    total_services += 1
+                else:
+                    raise NotImplementedError
+            bp = (total_services-allocated_services) / total_services
+            print("{}: allocated services is {}, total services is {}, bp is {}"
+                  .format(model_file, allocated_services,total_services, bp))
+>>>>>>> f2e48ddc65b99a1e310a4fc49fe7bd40f238862c
             # 开始计算ksp算法的对应结果
             env.mode = "alg"
             total_reward, total_services, allocated_services = 0, 0, 0
@@ -123,10 +150,15 @@ def random_comp(times: int=1):
                         allocated_services += 1
                 obs, reward, done, info = env.step(action)
             bp = (total_services-allocated_services) / total_services
+<<<<<<< HEAD
             port = env.get_all_edges_port()
             usility = env.get_resourceUtilization()
             print("{}: allocated services is {}, total services is {}, bp is {}, 端口数量为{}，资源利用率为{}"
                   .format(model_file, allocated_services,total_services, bp, port, usility))
+=======
+            print("ksp+First-Fit: allocated services is {}, total services is {}, bp is {}"
+                  .format(allocated_services,total_services, bp))
+>>>>>>> f2e48ddc65b99a1e310a4fc49fe7bd40f238862c
 
 
 if __name__ == "__main__":
